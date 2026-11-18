@@ -46,7 +46,7 @@
   function buildPlayer(host, id, onEnd) {
     const box=$(host); box.replaceChildren();
     const start=node('button',clips[id]?'▶ Слушать':'Загружается…','button primary');start.type='button';start.disabled=!clips[id];
-    if(!clips[id])window.addEventListener('city-audio-ready',()=>{start.disabled=!clips[id];start.textContent=clips[id]?'▶ Слушать':'Запись недоступна';},{once:true});
+    if(!clips[id]){const ready=()=>{if(!clips[id])return;start.disabled=false;start.textContent='▶ Слушать';window.removeEventListener('city-audio-ready',ready);};window.addEventListener('city-audio-ready',ready);}
     const pause=node('button','Пауза','button secondary');pause.type='button';pause.disabled=true;
     const stop=node('button','Стоп','button secondary');stop.type='button';stop.disabled=true;
     const speed=node('button','Медленнее','button secondary');speed.type='button';speed.setAttribute('aria-pressed','false');
@@ -175,5 +175,7 @@
   $('task-jump').addEventListener('change',()=>{taskIndex=Number($('task-jump').value);renderTask();});
   $('summary-open').addEventListener('click',()=>{location.hash='summary';});
   window.addEventListener('hashchange',()=>route(true));
+  const begin=$('name-form').querySelector('button[type=submit]');
+  begin.disabled=false;begin.textContent='Начать подготовку →';
   updateName();renderWords();renderSentences();renderTask();route();
 })();
