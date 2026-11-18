@@ -24,7 +24,7 @@
     return el;
   }
   function matchesSource(row, filter) {
-    return filter === 'all' || (filter === 'ЭМ' ? row.sources.includes('ЭМ') : row.group === filter);
+    return filter === 'all' || row.group === filter;
   }
   function updateName() {
     $('student-name').textContent = state.name;
