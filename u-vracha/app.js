@@ -9,7 +9,7 @@
   if (!saved || typeof saved !== 'object') saved = {};
   const state = {
     name: typeof saved.name === 'string' ? saved.name.slice(0, 60) : '',
-    words: new Set(Array.isArray(saved.words) ? saved.words.filter(w => bank.words.includes(w)) : []),
+    words: new Set(Array.isArray(saved.words) ? saved.words.map(w => w === "Простуда" ? "простуда" : w).filter(w => bank.words.includes(w)) : []),
     read: new Set(Array.isArray(saved.read) ? saved.read.filter(id => bank.rows.some(r => r.id === id)) : []),
     listened: new Set(Array.isArray(saved.listened) ? saved.listened.filter(id => bank.rows.some(r => r.id === id)) : [])
   };
