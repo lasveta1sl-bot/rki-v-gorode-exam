@@ -17,7 +17,11 @@
   const grading=window.CityGrading;
   const validIds=new Set(bank.rows.map(r=>r.id));
   let answers={};
-  for(const [id,a] of Object.entries(saved.answers||{}))if(validIds.has(id)&&a&&typeof a.choice==='boolean')answers[id]={choice:a.choice,submitted:a.submitted===true,skipped:a.skipped===true,correction:typeof a.correction==='string'?a.correction.slice(0,2000):''};
+  for(const [id,a] of Object.entries(saved.answers||{}))if(validIds.has(id)&&a&&typeof a.choice==='boolean')answers[id]={choice:a.choice,submitted:a.submitted===true,skipped:a.skipped===true,format:a.format==='words'?'words':'legacy',correction:typeof a.correction==='string'?a.correction.slice(0,2000):''};
+  for(const [id,a] of Object.entries(answers)){
+    const row=bank.rows.find(r=>r.id===id);
+    if(!a.submitted&&!row.matches&&!a.choice&&grading.normalize(a.correction)===grading.normalize(row.written_text))answers[id]={...a,format:'words',correction:''};
+  }
   let order=Array.isArray(saved.order)?saved.order.filter(id=>validIds.has(id)):[];
   order=[...new Set([...order,...validIds])];
   const groups=['all','9.3','9.5','practice','Другие фрагменты'];
@@ -47,27 +51,27 @@
     playGeneration++;
     player.pause();
     player.currentTime = 0;
-    if (activeControl) {activeControl.pause.textContent='Пауза'; activeControl.status.textContent=''; activeControl.pause.disabled=true; activeControl.stop.disabled=true;}
+    if (activeControl) {activeControl.pause.textContent='Пауза · 暂停'; activeControl.status.textContent=''; activeControl.pause.disabled=true; activeControl.stop.disabled=true;}
     activeControl=null;
   }
   function buildPlayer(host, id, onEnd) {
     const box=$(host); box.replaceChildren();
-    const start=node('button',clips[id]?'▶ Слушать':'Загружается…','button primary');start.type='button';start.disabled=!clips[id];
-    if(!clips[id]){const ready=()=>{if(!clips[id])return;start.disabled=false;start.textContent='▶ Слушать';window.removeEventListener('city-audio-ready',ready);};window.addEventListener('city-audio-ready',ready);}
-    const pause=node('button','Пауза','button secondary');pause.type='button';pause.disabled=true;
-    const stop=node('button','Стоп','button secondary');stop.type='button';stop.disabled=true;
-    const speed=node('button','Медленнее','button secondary');speed.type='button';speed.setAttribute('aria-pressed','false');
+    const start=node('button',clips[id]?'▶ Слушать · 听':'Загрузка · 加载中…','button primary');start.type='button';start.disabled=!clips[id];
+    if(!clips[id]){const ready=()=>{if(!clips[id])return;start.disabled=false;start.textContent='▶ Слушать · 听';window.removeEventListener('city-audio-ready',ready);};window.addEventListener('city-audio-ready',ready);}
+    const pause=node('button','Пауза · 暂停','button secondary');pause.type='button';pause.disabled=true;
+    const stop=node('button','Стоп · 停止','button secondary');stop.type='button';stop.disabled=true;
+    const speed=node('button','Медленнее · 慢速','button secondary');speed.type='button';speed.setAttribute('aria-pressed','false');
     const status=node('span','','audio-status');status.setAttribute('role','status');
     const control={start,pause,stop,speed,status,id,onEnd,slow:false};
     async function play() {
       const generation=++playGeneration;
-      try {await player.play(); if(generation!==playGeneration)return;pause.disabled=false;stop.disabled=false;pause.textContent='Пауза';status.textContent='Слушайте';}
+      try {await player.play(); if(generation!==playGeneration)return;pause.disabled=false;stop.disabled=false;pause.textContent='Пауза · 暂停';status.textContent='Слушайте · 请听';}
       catch {if(generation!==playGeneration)return;status.textContent='Не удалось включить запись. Нажмите «Слушать» ещё раз.';pause.disabled=true;stop.disabled=true;}
     }
     start.addEventListener('click',()=>{
       stopAudio();activeControl=control;player.src=clips[id];player.playbackRate=control.slow?0.8:1;play();
     });
-    pause.addEventListener('click',()=>{if(activeControl!==control)return;if(player.paused)play();else{playGeneration++;player.pause();pause.textContent='Продолжить';status.textContent='Пауза';}});
+    pause.addEventListener('click',()=>{if(activeControl!==control)return;if(player.paused)play();else{playGeneration++;player.pause();pause.textContent='Продолжить · 继续';status.textContent='Пауза · 暂停';}});
     stop.addEventListener('click',stopAudio);
     speed.addEventListener('click',()=>{control.slow=!control.slow;speed.setAttribute('aria-pressed',String(control.slow));if(activeControl===control)player.playbackRate=control.slow?0.8:1;});
     box.append(start,pause,stop,speed,status);
@@ -75,7 +79,7 @@
   }
   player.addEventListener('ended',()=>{
     if(!activeControl)return;
-    const control=activeControl;control.pause.disabled=true;control.stop.disabled=true;control.status.textContent='Можно слушать ещё раз';
+    const control=activeControl;control.pause.disabled=true;control.stop.disabled=true;control.status.textContent='Слушайте ещё раз, если нужно. 可以再听。';
     if(bank.rows.some(row=>row.id===control.id))state.listened.add(control.id);
     persist();control.onEnd();
   });
@@ -98,7 +102,7 @@
       });
       const feedback=$(prefix+'-feedback');
       feedback.className='answer-feedback'+(answer?(g.choiceCorrect?' correct':' incorrect'):'');
-      feedback.textContent=!answer?(heard?'Теперь выберите «√ Да» или «Нет».':'Сначала прослушайте предложение целиком.'):g.choiceCorrect?(row.matches?'✓ Верный выбор. Предложения совпадают.':'✓ Верный выбор. Есть отличия. За выбор — 1 балл.'):(row.matches?'✕ Неверный выбор. Предложения совпадают.':'✕ Неверный выбор. В предложениях есть отличия.');
+      feedback.textContent=!answer?(heard?'Выберите: одинаково или нет? 请选择：是否相同？':'Сначала слушайте. 请先听完整句子。'):g.choiceCorrect?(row.matches?'✓ Верно. Одинаково. 答对了，内容相同。':'✓ Верно. Есть разные слова. +1 балл. 答对了，有不同的词。+1分。'):(row.matches?'✕ Нет. Слова одинаковые. 选错了，内容相同。':'✕ Нет. Есть разные слова. 选错了，有不同的词。');
       const pending=!!answer&&!g.done;
       $(prefix+'-correction-form').hidden=!pending;
       $(prefix+'-comparison').hidden=!g.done;
@@ -109,41 +113,42 @@
         highlight($(prefix+'-written'),diff.written,'written');
         highlight($(prefix+'-heard'),diff.heard,'heard');
         const pairs=$(prefix+'-pairs');pairs.replaceChildren();
-        if(row.matches)pairs.append(node('p','Слова совпадают. Исправления не нужны.'));
+        if(row.matches)pairs.append(node('p','Всё одинаково. 内容相同，不用改。'));
         else row.changes.forEach(c=>{
           const pair=node('div',undefined,'word-pair');
           const written=node('div'),audio=node('div');
-          written.append(node('span','Вижу','pair-label'),node('mark',c.written,'difference-written'));
-          audio.append(node('span','Слышу','pair-label'),node('mark',c.audio,'difference-heard'));
+          written.append(node('span','Вижу · 看到的','pair-label'),node('mark',c.written,'difference-written'));
+          audio.append(node('span','Слышу · 听到的','pair-label'),node('mark',c.audio,'difference-heard'));
           pair.append(written,audio);pairs.append(pair);
         });
-        let result=g.points+' из 2 баллов. ';
-        if(!g.choiceCorrect)result+='За выбор — 0. Послушайте ещё раз и сравните слова.';
-        else if(row.matches)result+='За верное совпадение — 2 балла.';
-        else if(g.correctionCorrect)result+='За выбор — 1, за все верные исправления — 1.';
-        else if(answer.skipped)result+='За выбор — 1, за исправления — 0: ответ открыт без исправления.';
-        else result+='За выбор — 1, за исправления — 0: исправлены не все отличия или появились новые ошибки.';
+        let result=g.points+' / 2 балла · 分。 ';
+        if(!g.choiceCorrect)result+='Выбор: 0. Слушайте ещё раз. 判断：0分。请再听一次。';
+        else if(row.matches)result+='Верно: +2. 判断正确：+2分。';
+        else if(g.correctionCorrect)result+='Выбор: +1. Слова: +1. 判断：+1分。改词：+1分。';
+        else if(answer.skipped)result+='Выбор: +1. Слова: 0. Вы открыли ответ. 判断：+1分。改词：0分，已查看答案。';
+        else result+='Выбор: +1. Слова: 0. Сравните слова ниже. 判断：+1分。改词：0分。请对照正确答案。';
         $(prefix+'-result').textContent=result;
         $(prefix+'-result').className='score-feedback '+(g.points===2?'correct':g.points===1?'partial':'incorrect');
         if(answer.submitted&&!answer.skipped){
-          const submitted=node('p',undefined,'submitted-answer');submitted.append(node('strong','Ваше исправление: '),document.createTextNode(answer.correction));pairs.append(submitted);
+          const submitted=node('p',undefined,'submitted-answer');submitted.append(node('strong','Ваш ответ · 你的答案：'),document.createTextNode(answer.correction));pairs.append(submitted);
         }
       }
     }
     function choose(choice){
       if(!heard||getAnswer())return;
       const row=getRow();
-      setAnswer({choice,submitted:false,skipped:false,correction:row.written_text});
+      setAnswer({choice,submitted:false,skipped:false,format:'words',correction:''});
       refresh();onComplete();
       if(!grading.grade(row,getAnswer()).done)$(prefix+'-correction').focus();
     }
     $(prefix+'-yes').addEventListener('click',()=>choose(true));
     $(prefix+'-no').addEventListener('click',()=>choose(false));
     $(prefix+'-correction').addEventListener('input',()=>{
-      const a=getAnswer();if(a&&!grading.grade(getRow(),a).done)setAnswer({...a,correction:$(prefix+'-correction').value});
+      $(prefix+'-correction').setCustomValidity('');const a=getAnswer();if(a&&!grading.grade(getRow(),a).done)setAnswer({...a,correction:$(prefix+'-correction').value});
     });
     function submit(skipped){
       const a=getAnswer();if(!a||grading.grade(getRow(),a).done)return;
+      if(!skipped&&!$(prefix+'-correction').value.trim()){$(prefix+'-correction').setCustomValidity('Напишите слово. 请写出你听到的词。');$(prefix+'-correction').reportValidity();return;}
       setAnswer({...a,correction:$(prefix+'-correction').value,submitted:true,skipped});refresh();onComplete();
     }
     $(prefix+'-correction-form').addEventListener('submit',e=>{e.preventDefault();submit(false);});
@@ -204,7 +209,7 @@
   function updateProgress(){
     const stats=grading.stats(taskRows(),answers);
     $('task-progress').textContent='Выполнено '+stats.done+' из '+stats.total+'. Набрано баллов: '+stats.points+' / '+(stats.total*2)+'.';
-    $('task-next').textContent=taskIndex===taskRows().length-1?'Показать результат':'Дальше';
+    $('task-next').textContent=taskIndex===taskRows().length-1?'Результат · 成绩':'Дальше · 下一题';
   }
   const taskExercise=createExercise('task',()=>taskRows()[taskIndex],()=>answers[taskRows()[taskIndex].id],a=>{answers[taskRows()[taskIndex].id]=a;persist();},updateProgress);
   let demoAnswer=null;
@@ -221,13 +226,13 @@
     $('summary-name').textContent=state.name;
     const stats=grading.stats(taskRows(),answers);
     $('summary-scope').textContent='Материал: '+$('task-filter').selectedOptions[0].textContent;
-    $('summary-status').textContent=stats.done===stats.total?'Подготовка завершена.':stats.done?'Промежуточный результат. Выполнено '+stats.done+' из '+stats.total+' предложений.':'Вы ещё не завершили ни одного предложения.';
+    $('summary-status').textContent=stats.done===stats.total?'Готово! 已完成。':stats.done?'Ещё не всё. 尚未完成。 '+stats.done+' из '+stats.total+' предложений.':'Ответов пока нет. 尚未完成任何题目。';
     const box=$('summary-assessment');box.replaceChildren();
     const percent=node('p',stats.done?String(stats.percent).replace('.',',')+'%':'—','result-percent');
     box.append(percent,node('p','Набрано баллов: '+stats.points+' из '+stats.max+'. Выполнено предложений: '+stats.done+'.','score-caption'));
     if(stats.done){
       const list=node('dl');
-      [['Полностью верно',stats.full+' из '+stats.done+' ('+String(stats.fullPercent).replace('.',',')+'%)'],['Верный выбор «Да / Нет»',stats.choices+' из '+stats.done+' ('+String(stats.choicePercent).replace('.',',')+'%)'],['Прогресс',stats.done+' из '+stats.total]].forEach(([label,value])=>{const item=node('div');item.append(node('dt',label),node('dd',value));list.append(item);});
+      [['Всё верно · 全对',stats.full+' из '+stats.done+' ('+String(stats.fullPercent).replace('.',',')+'%)'],['Верный выбор · 判断正确',stats.choices+' из '+stats.done+' ('+String(stats.choicePercent).replace('.',',')+'%)'],['Выполнено · 已完成',stats.done+' из '+stats.total]].forEach(([label,value])=>{const item=node('div');item.append(node('dt',label),node('dd',value));list.append(item);});
       box.append(list);
     }
     if(stats.done<stats.total)box.append(node('p','Проценты рассчитаны только по завершённым предложениям. Максимум баллов за весь выбранный материал: '+(stats.total*2)+'.','caption'));

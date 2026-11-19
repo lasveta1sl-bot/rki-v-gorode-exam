@@ -2,12 +2,20 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.CityGrading=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
   const normalize=text=>String(text||'').normalize('NFC').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\u0301/g,'').match(/[\p{L}\p{N}]+/gu)?.join(' ')||'';
+  function correctionMatches(row,answer){
+    const entered=normalize(answer.correction),expected=normalize(row.changes.map(c=>c.audio).join(' '));
+    if(!entered||!expected)return false;
+    if(entered===expected||entered===normalize(row.audio_text))return true;
+    // Earlier UI prefilled the entire written sentence. Accept an exact appended
+    // correction from those saved attempts only; never guess or fuzzy-match words.
+    return answer.format!=='words'&&entered===normalize(row.written_text)+' '+expected;
+  }
   function grade(row,answer){
     if(!answer||typeof answer.choice!=='boolean')return {done:false,choiceCorrect:false,correctionCorrect:false,points:0};
     const choiceCorrect=answer.choice===row.matches;
     const needsCorrection=choiceCorrect&&!row.matches;
     const done=!needsCorrection||answer.submitted===true;
-    const correctionCorrect=needsCorrection&&done&&!answer.skipped&&normalize(answer.correction)===normalize(row.audio_text);
+    const correctionCorrect=needsCorrection&&done&&!answer.skipped&&correctionMatches(row,answer);
     return {done,choiceCorrect,correctionCorrect,points:choiceCorrect?(row.matches?2:1+Number(correctionCorrect)):0};
   }
   function stats(rows,answers){
