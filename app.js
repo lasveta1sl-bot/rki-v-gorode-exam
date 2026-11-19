@@ -14,9 +14,17 @@
     listened: new Set(Array.isArray(saved.listened) ? saved.listened.filter(id => bank.rows.some(r => r.id === id)) : [])
   };
   let sentenceLimit = 6;
-  let taskIndex = 0;
+  const grading=window.CityGrading;
+  const validIds=new Set(bank.rows.map(r=>r.id));
+  let answers={};
+  for(const [id,a] of Object.entries(saved.answers||{}))if(validIds.has(id)&&a&&typeof a.choice==='boolean')answers[id]={choice:a.choice,submitted:a.submitted===true,skipped:a.skipped===true,correction:typeof a.correction==='string'?a.correction.slice(0,2000):''};
+  let order=Array.isArray(saved.order)?saved.order.filter(id=>validIds.has(id)):[];
+  order=[...new Set([...order,...validIds])];
+  const groups=['all','9.3','9.5','practice','Другие фрагменты'];
+  $('task-filter').value=groups.includes(saved.filter)?saved.filter:'all';
+  let taskIndex=Number.isInteger(saved.taskIndex)&&saved.taskIndex>=0?saved.taskIndex:0;
   const persist = () => {
-    try { localStorage.setItem(storageKey, JSON.stringify({name:state.name,words:[...state.words],read:[...state.read],listened:[...state.listened]})); }
+    try { localStorage.setItem(storageKey, JSON.stringify({name:state.name,words:[...state.words],read:[...state.read],listened:[...state.listened],answers,order,filter:$('task-filter').value,taskIndex})); }
     catch { /* The page remains usable when browser storage is unavailable. */ }
   };
   function node(tag, text, className) {
@@ -35,7 +43,6 @@
   player.preload = 'auto';
   let activeControl = null;
   let playGeneration = 0;
-  let taskHeard = false;
   function stopAudio() {
     playGeneration++;
     player.pause();
@@ -73,12 +80,75 @@
     persist();control.onEnd();
   });
   player.addEventListener('error',()=>{if(activeControl){activeControl.status.textContent='Запись не загрузилась. Попробуйте ещё раз.';activeControl.pause.disabled=true;activeControl.stop.disabled=true;}});
-  function answerTask(value) {
-    if(!taskHeard)return;
-    const r=taskRows()[taskIndex];
-    $('answer-feedback').textContent=value===r.matches?(r.matches?'Верно, фразы совпадают.':'Верно, есть отличия. Посмотрите, какие слова нужно исправить.'):(r.matches?'Фразы совпадают. Послушайте ещё раз.':'Во фразах есть отличия. Посмотрите разбор и послушайте ещё раз.');
-    $('answer-yes').disabled=true;$('answer-no').disabled=true;
-    $('task-details').hidden=false;$('task-details').open=true;
+  function highlight(host,tokens,kind){
+    host.replaceChildren();
+    tokens.forEach(t=>host.append(t.changed?node('mark',t.text,'difference-'+kind):document.createTextNode(t.text)));
+  }
+  function createExercise(prefix,getRow,getAnswer,setAnswer,onComplete){
+    let heard=false;
+    function refresh(){
+      const row=getRow(),answer=getAnswer(),g=grading.grade(row,answer);
+      const yes=$(prefix+'-yes'),no=$(prefix+'-no');
+      [yes,no].forEach((button,i)=>{
+        const chosen=!!answer&&answer.choice===(i===0);
+        button.disabled=!heard||!!answer;
+        button.setAttribute('aria-pressed',String(chosen));
+        button.classList.toggle('choice-correct',chosen&&g.choiceCorrect);
+        button.classList.toggle('choice-incorrect',chosen&&!g.choiceCorrect);
+      });
+      const feedback=$(prefix+'-feedback');
+      feedback.className='answer-feedback'+(answer?(g.choiceCorrect?' correct':' incorrect'):'');
+      feedback.textContent=!answer?(heard?'Теперь выберите «√ Да» или «Нет».':'Сначала прослушайте предложение целиком.'):g.choiceCorrect?(row.matches?'✓ Верный выбор. Предложения совпадают.':'✓ Верный выбор. Есть отличия. За выбор — 1 балл.'):(row.matches?'✕ Неверный выбор. Предложения совпадают.':'✕ Неверный выбор. В предложениях есть отличия.');
+      const pending=!!answer&&!g.done;
+      $(prefix+'-correction-form').hidden=!pending;
+      $(prefix+'-comparison').hidden=!g.done;
+      $(prefix+'-written').textContent=row.written_text;
+      if(pending)$(prefix+'-correction').value=answer.correction;
+      if(g.done){
+        const diff=grading.differences(row.written_text,row.audio_text);
+        highlight($(prefix+'-written'),diff.written,'written');
+        highlight($(prefix+'-heard'),diff.heard,'heard');
+        const pairs=$(prefix+'-pairs');pairs.replaceChildren();
+        if(row.matches)pairs.append(node('p','Слова совпадают. Исправления не нужны.'));
+        else row.changes.forEach(c=>{
+          const pair=node('div',undefined,'word-pair');
+          const written=node('div'),audio=node('div');
+          written.append(node('span','Вижу','pair-label'),node('mark',c.written,'difference-written'));
+          audio.append(node('span','Слышу','pair-label'),node('mark',c.audio,'difference-heard'));
+          pair.append(written,audio);pairs.append(pair);
+        });
+        let result=g.points+' из 2 баллов. ';
+        if(!g.choiceCorrect)result+='За выбор — 0. Послушайте ещё раз и сравните слова.';
+        else if(row.matches)result+='За верное совпадение — 2 балла.';
+        else if(g.correctionCorrect)result+='За выбор — 1, за все верные исправления — 1.';
+        else if(answer.skipped)result+='За выбор — 1, за исправления — 0: ответ открыт без исправления.';
+        else result+='За выбор — 1, за исправления — 0: исправлены не все отличия или появились новые ошибки.';
+        $(prefix+'-result').textContent=result;
+        $(prefix+'-result').className='score-feedback '+(g.points===2?'correct':g.points===1?'partial':'incorrect');
+        if(answer.submitted&&!answer.skipped){
+          const submitted=node('p',undefined,'submitted-answer');submitted.append(node('strong','Ваше исправление: '),document.createTextNode(answer.correction));pairs.append(submitted);
+        }
+      }
+    }
+    function choose(choice){
+      if(!heard||getAnswer())return;
+      const row=getRow();
+      setAnswer({choice,submitted:false,skipped:false,correction:row.written_text});
+      refresh();onComplete();
+      if(!grading.grade(row,getAnswer()).done)$(prefix+'-correction').focus();
+    }
+    $(prefix+'-yes').addEventListener('click',()=>choose(true));
+    $(prefix+'-no').addEventListener('click',()=>choose(false));
+    $(prefix+'-correction').addEventListener('input',()=>{
+      const a=getAnswer();if(a&&!grading.grade(getRow(),a).done)setAnswer({...a,correction:$(prefix+'-correction').value});
+    });
+    function submit(skipped){
+      const a=getAnswer();if(!a||grading.grade(getRow(),a).done)return;
+      setAnswer({...a,correction:$(prefix+'-correction').value,submitted:true,skipped});refresh();onComplete();
+    }
+    $(prefix+'-correction-form').addEventListener('submit',e=>{e.preventDefault();submit(false);});
+    $(prefix+'-skip').addEventListener('click',()=>submit(true));
+    return {render(){heard=false;refresh();buildPlayer(prefix+'-player',getRow().id,()=>{heard=true;refresh();});}};
   }
   function updateName() {
     $('student-name').textContent = state.name;
@@ -130,26 +200,37 @@
     $('sentence-count').textContent='Показано '+Math.min(sentenceLimit,filtered.length)+' из '+filtered.length;
     $('more-sentences').hidden=sentenceLimit>=filtered.length;
   }
-  const taskRows = () => bank.rows.filter(r=>matchesSource(r,$('task-filter').value));
-  function renderTask(reset=false) {
-    stopAudio();taskHeard=false;
-    const rows=taskRows(); if(reset)taskIndex=0;taskIndex=Math.min(taskIndex,rows.length-1);
-    const r=rows[taskIndex];
-    $('task-count').textContent='Пример '+(taskIndex+1)+' из '+rows.length;
-    $('task-source').textContent='';
-    $('task-written').textContent=r.written_text;$('task-audio').textContent=r.audio_text;
-    const key=$('task-key');key.replaceChildren(node('h3',r.matches?'Да, совпадает':'Нет, есть отличия'));
-    if(r.matches)key.append(node('p','Написанное полностью соответствует исходной фразе. Исправления не нужны.'));
-    else r.changes.forEach(c=>key.append(node('p',c.written+' → '+c.audio)));
-    $('task-details').open=false;
-    $('task-details').hidden=true;$('answer-feedback').textContent='';
-    $('answer-yes').disabled=true;$('answer-no').disabled=true;
-    buildPlayer('task-player',r.id,()=>{taskHeard=true;$('answer-yes').disabled=false;$('answer-no').disabled=false;});
-    $('task-prev').disabled=taskIndex===0;$('task-next').disabled=taskIndex===rows.length-1;
+  const taskRows=()=>order.map(id=>bank.rows.find(r=>r.id===id)).filter(r=>matchesSource(r,$('task-filter').value));
+  function updateProgress(){
+    const stats=grading.stats(taskRows(),answers);
+    $('task-progress').textContent='Выполнено '+stats.done+' из '+stats.total+'. Набрано баллов: '+stats.points+' / '+(stats.total*2)+'.';
+    $('task-next').textContent=taskIndex===taskRows().length-1?'Показать результат':'Дальше';
+  }
+  const taskExercise=createExercise('task',()=>taskRows()[taskIndex],()=>answers[taskRows()[taskIndex].id],a=>{answers[taskRows()[taskIndex].id]=a;persist();},updateProgress);
+  let demoAnswer=null;
+  const demoExercise=createExercise('demo',()=>bank.rows.find(r=>r.id==='CITY-006'),()=>demoAnswer,a=>{demoAnswer=a;},()=>{});
+  function renderTask(reset=false){
+    stopAudio();
+    const rows=taskRows();if(reset)taskIndex=0;taskIndex=Math.min(taskIndex,rows.length-1);
+    $('task-count').textContent='Предложение '+(taskIndex+1)+' из '+rows.length;
+    taskExercise.render();updateProgress();persist();
+    $('task-prev').disabled=taskIndex===0;
     const jump=$('task-jump');jump.replaceChildren();rows.forEach((row,i)=>{const option=node('option',String(i+1));option.value=String(i);jump.append(option);});jump.value=String(taskIndex);
   }
   function renderSummary() {
     $('summary-name').textContent=state.name;
+    const stats=grading.stats(taskRows(),answers);
+    $('summary-scope').textContent='Материал: '+$('task-filter').selectedOptions[0].textContent;
+    $('summary-status').textContent=stats.done===stats.total?'Подготовка завершена.':stats.done?'Промежуточный результат. Выполнено '+stats.done+' из '+stats.total+' предложений.':'Вы ещё не завершили ни одного предложения.';
+    const box=$('summary-assessment');box.replaceChildren();
+    const percent=node('p',stats.done?String(stats.percent).replace('.',',')+'%':'—','result-percent');
+    box.append(percent,node('p','Набрано баллов: '+stats.points+' из '+stats.max+'. Выполнено предложений: '+stats.done+'.','score-caption'));
+    if(stats.done){
+      const list=node('dl');
+      [['Полностью верно',stats.full+' из '+stats.done+' ('+String(stats.fullPercent).replace('.',',')+'%)'],['Верный выбор «Да / Нет»',stats.choices+' из '+stats.done+' ('+String(stats.choicePercent).replace('.',',')+'%)'],['Прогресс',stats.done+' из '+stats.total]].forEach(([label,value])=>{const item=node('div');item.append(node('dt',label),node('dd',value));list.append(item);});
+      box.append(list);
+    }
+    if(stats.done<stats.total)box.append(node('p','Проценты рассчитаны только по завершённым предложениям. Максимум баллов за весь выбранный материал: '+(stats.total*2)+'.','caption'));
     $('summary-words').textContent=state.words.size+' / '+bank.words.length;
     $('summary-sentences').textContent=state.read.size+' / '+bank.rows.length;
     $('summary-listened').textContent=state.listened.size+' / '+bank.rows.length;
@@ -165,13 +246,18 @@
   $('word-search').addEventListener('input',renderWords);
   $('sentence-filter').addEventListener('change',()=>{sentenceLimit=6;renderSentences();});
   $('more-sentences').addEventListener('click',()=>{sentenceLimit+=6;renderSentences();});
-  buildPlayer('demo-player','CITY-006',()=>{$('demo-audio').hidden=false;$('demo-key').hidden=false;});
-  $('answer-yes').addEventListener('click',()=>answerTask(true));
-  $('answer-no').addEventListener('click',()=>answerTask(false));
+  demoExercise.render();
+  $('new-attempt').addEventListener('click',()=>{
+    answers={};
+    const previous=order.join(',');
+    for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+    if(order.join(',')===previous)order.push(order.shift());
+    $('task-filter').value='all';renderTask(true);location.hash='task';
+  });
   window.addEventListener('pagehide',stopAudio);
   $('task-filter').addEventListener('change',()=>renderTask(true));
   $('task-prev').addEventListener('click',()=>{if(taskIndex>0){taskIndex--;renderTask();}});
-  $('task-next').addEventListener('click',()=>{if(taskIndex<taskRows().length-1){taskIndex++;renderTask();}});
+  $('task-next').addEventListener('click',()=>{if(taskIndex<taskRows().length-1){taskIndex++;renderTask();}else{location.hash='summary';}});
   $('task-jump').addEventListener('change',()=>{taskIndex=Number($('task-jump').value);renderTask();});
   $('summary-open').addEventListener('click',()=>{location.hash='summary';});
   window.addEventListener('hashchange',()=>route(true));
