@@ -180,9 +180,9 @@
       const id='WORD-'+String(bank.words.indexOf(word)+1).padStart(3,'0');
       const card=node('div',undefined,'word-card');
       const button = node('button',undefined,'word');button.type='button';
-      button.setAttribute('aria-label','Слушать: '+word.toLocaleLowerCase('ru'));button.append(node('span',word.toLocaleLowerCase('ru')));
+      button.setAttribute('aria-label','Слушать: '+(/^[А-ЯЁA-Z]{2,}$/.test(word) ? word : word.toLocaleLowerCase('ru')));button.append(node('span',(/^[А-ЯЁA-Z]{2,}$/.test(word) ? word : word.toLocaleLowerCase('ru'))));
       button.addEventListener('click',()=>{const controls=buildPlayer('word-player',id,()=>{});if(clips[id])controls.start.click();});
-      const mark=node('button',state.words.has(word)?'✓':'○','word-mark');mark.type='button';mark.setAttribute('aria-label','Повторено: '+word.toLocaleLowerCase('ru'));mark.setAttribute('aria-pressed',String(state.words.has(word)));
+      const mark=node('button',state.words.has(word)?'✓':'○','word-mark');mark.type='button';mark.setAttribute('aria-label','Повторено: '+(/^[А-ЯЁA-Z]{2,}$/.test(word) ? word : word.toLocaleLowerCase('ru')));mark.setAttribute('aria-pressed',String(state.words.has(word)));
       mark.addEventListener('click',()=>{if(state.words.has(word))state.words.delete(word);else state.words.add(word);persist();mark.textContent=state.words.has(word)?'✓':'○';mark.setAttribute('aria-pressed',String(state.words.has(word)));$('word-count').textContent='Повторено '+state.words.size+' из '+bank.words.length;});
       card.append(button,mark);container.append(card);
     });
