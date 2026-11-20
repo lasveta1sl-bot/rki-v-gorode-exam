@@ -11,7 +11,7 @@ body > header:not(#rki-header),body > main > .lesson-nav,body > main > nav[aria-
 .rki-nav-label{font-size:17px;font-weight:650;line-height:1.4;margin:12px 0 0}
 .rki-nav-label span{display:block;font-size:15px;font-weight:400}
 #rki-navigation nav{display:grid;margin:0;padding:0;gap:12px}
-#rki-navigation .rki-tasks{grid-template-columns:repeat(5,1fr)}
+#rki-navigation .rki-tasks{grid-template-columns:repeat(6,1fr)}
 #rki-navigation .rki-lessons{grid-template-columns:repeat(5,1fr)}
 #rki-navigation nav a{display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:62px;padding:10px 16px;border:1px solid #b8cbc3;border-radius:6px;background:#fff;line-height:1.35;font-size:18px}
 #rki-navigation .rki-lessons a{min-height:96px}

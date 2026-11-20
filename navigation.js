@@ -33,6 +33,7 @@
   const href = (t,l,keepSection=false) => {
     const item=lessons.find(x=>x.id===l);
     const section=location.hash.slice(1);
+    if(t===6) return root+'task-6/'+item.slug+'/index.html#'+(keepSection&&['words','demo','practice'].includes(section)?section:'words');
     if(t===1) return root+(l===9?'prepare.html':item.slug+'/index.html')+'#'+(keepSection&&['words','sentences','format','task'].includes(section)?section:'words');
     if(t===2) return root+'task-2/index.html?lesson='+l+'#'+(keepSection&&['words','sentences','demo','practice'].includes(section)?section:'words');
     return root+'task-'+t+'/'+item.slug+'/index.html';
@@ -43,7 +44,7 @@
     const navigation=document.getElementById('rki-navigation');
     if(!header || !navigation)return;
     header.innerHTML=`<a class="rki-brand" href="${root}index.html">Русский на слух</a><div class="rki-header-actions"><a href="${root}index.html">На главную <span lang="zh">· 首页</span></a><button id="rki-name" type="button"></button></div>`;
-    navigation.innerHTML=`<div class="rki-nav-row"><p class="rki-nav-label">Задание <span lang="zh">· 题型</span></p><nav class="rki-tasks" aria-label="Задания экзамена">${[1,2,3,4,5].map(t=>`<a data-task="${t}" href="${task?href(t,lesson.id):'#'+anchor(t)}" ${t===task?'aria-current="page"':''}>Задание ${t}<span lang="zh">题型 ${t}</span></a>`).join('')}</nav></div>${task?`<div class="rki-nav-row"><p class="rki-nav-label">Урок <span lang="zh">· 课程</span></p><nav class="rki-lessons" aria-label="Уроки задания ${task}">${lessons.map(l=>`<a data-lesson="${l.id}" href="${href(task,l.id,true)}" ${l.id===lesson.id?'aria-current="page"':''}><span>Урок ${l.id}</span><strong>${l.title}</strong><span lang="zh">${l.zh}</span></a>`).join('')}</nav></div><a class="rki-all-lessons" href="${root}index.html#${anchor(task)}">Все уроки задания ${task} <span lang="zh">· 本题型全部课程</span></a>`:''}`;
+    navigation.innerHTML=`<div class="rki-nav-row"><p class="rki-nav-label">Задание <span lang="zh">· 题型</span></p><nav class="rki-tasks" aria-label="Задания экзамена">${[1,2,3,4,5,6].map(t=>`<a data-task="${t}" href="${task?href(t,lesson.id):'#'+anchor(t)}" ${t===task?'aria-current="page"':''}>Задание ${t}<span lang="zh">题型 ${t}</span></a>`).join('')}</nav></div>${task?`<div class="rki-nav-row"><p class="rki-nav-label">Урок <span lang="zh">· 课程</span></p><nav class="rki-lessons" aria-label="Уроки задания ${task}">${lessons.map(l=>`<a data-lesson="${l.id}" href="${href(task,l.id,true)}" ${l.id===lesson.id?'aria-current="page"':''}><span>Урок ${l.id}</span><strong>${l.title}</strong><span lang="zh">${l.zh}</span></a>`).join('')}</nav></div><a class="rki-all-lessons" href="${root}index.html#${anchor(task)}">Все уроки задания ${task} <span lang="zh">· 本题型全部课程</span></a>`:''}`;
     const button=document.getElementById('rki-name');
     const updateName=()=>{button.textContent=name?name+' · Изменить имя · 修改姓名':'Ввести имя · 填写姓名';button.hidden=!task;};
     updateName();
