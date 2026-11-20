@@ -14,7 +14,7 @@
   let lesson = lessons.find(x => x.id === requested) || lessons[0];
   const profileKey = 'rki-student-name';
   const task1Keys = ['rki-city-exam-preview-v1','rki-doctor-exam-v1','rki-shop-exam-v1','rki-look-exam-v1'];
-  const currentKey = task === 1 ? task1Keys[lesson.id-9] : task === 2 ? 'rki-task2-v1' : task === 3 ? `rki-task3-r3-2026-11-20-lesson${lesson.id}` : null;
+  const currentKey = task === 1 ? task1Keys[lesson.id-9] : task === 2 ? 'rki-task2-v1' : task === 3 ? `rki-task3-r3-2026-11-20-lesson${lesson.id}` : task === 4 ? `rki-task4-r2-2026-11-20-lesson${lesson.id}` : task === 5 ? `rki-task5-v1-lesson${lesson.id}` : null;
   const clean = s => typeof s === 'string' ? s.trim().replace(/\s+/g,' ').slice(0,60) : '';
   const read = key => {try {return JSON.parse(localStorage.getItem(key)||'{}') || {};} catch {return {};}};
   let name = '';
@@ -35,7 +35,7 @@
     const section=location.hash.slice(1);
     if(t===1) return root+(l===9?'prepare.html':item.slug+'/index.html')+'#'+(keepSection&&['words','sentences','format','task'].includes(section)?section:'words');
     if(t===2) return root+'task-2/index.html?lesson='+l+'#'+(keepSection&&['words','sentences','demo','practice'].includes(section)?section:'words');
-    return root+'task-3/'+item.slug+'/index.html';
+    return root+'task-'+t+'/'+item.slug+'/index.html';
   };
   const anchor = t => t===1?'task-title':'task-'+t;
   function mount() {
@@ -43,7 +43,7 @@
     const navigation=document.getElementById('rki-navigation');
     if(!header || !navigation)return;
     header.innerHTML=`<a class="rki-brand" href="${root}index.html">Русский на слух</a><div class="rki-header-actions"><a href="${root}index.html">На главную <span lang="zh">· 首页</span></a><button id="rki-name" type="button"></button></div>`;
-    navigation.innerHTML=`<div class="rki-nav-row"><p class="rki-nav-label">Задание <span lang="zh">· 题型</span></p><nav class="rki-tasks" aria-label="Задания экзамена">${[1,2,3].map(t=>`<a data-task="${t}" href="${task?href(t,lesson.id):'#'+anchor(t)}" ${t===task?'aria-current="page"':''}>Задание ${t}<span lang="zh">题型 ${t}</span></a>`).join('')}</nav></div>${task?`<div class="rki-nav-row"><p class="rki-nav-label">Урок <span lang="zh">· 课程</span></p><nav class="rki-lessons" aria-label="Уроки задания ${task}">${lessons.map(l=>`<a data-lesson="${l.id}" href="${href(task,l.id,true)}" ${l.id===lesson.id?'aria-current="page"':''}><span>Урок ${l.id}</span><strong>${l.title}</strong><span lang="zh">${l.zh}</span></a>`).join('')}</nav></div><a class="rki-all-lessons" href="${root}index.html#${anchor(task)}">Все уроки задания ${task} <span lang="zh">· 本题型全部课程</span></a>`:''}`;
+    navigation.innerHTML=`<div class="rki-nav-row"><p class="rki-nav-label">Задание <span lang="zh">· 题型</span></p><nav class="rki-tasks" aria-label="Задания экзамена">${[1,2,3,4,5].map(t=>`<a data-task="${t}" href="${task?href(t,lesson.id):'#'+anchor(t)}" ${t===task?'aria-current="page"':''}>Задание ${t}<span lang="zh">题型 ${t}</span></a>`).join('')}</nav></div>${task?`<div class="rki-nav-row"><p class="rki-nav-label">Урок <span lang="zh">· 课程</span></p><nav class="rki-lessons" aria-label="Уроки задания ${task}">${lessons.map(l=>`<a data-lesson="${l.id}" href="${href(task,l.id,true)}" ${l.id===lesson.id?'aria-current="page"':''}><span>Урок ${l.id}</span><strong>${l.title}</strong><span lang="zh">${l.zh}</span></a>`).join('')}</nav></div><a class="rki-all-lessons" href="${root}index.html#${anchor(task)}">Все уроки задания ${task} <span lang="zh">· 本题型全部课程</span></a>`:''}`;
     const button=document.getElementById('rki-name');
     const updateName=()=>{button.textContent=name?name+' · Изменить имя · 修改姓名':'Ввести имя · 填写姓名';button.hidden=!task;};
     updateName();
@@ -94,5 +94,5 @@
       if(task)navigation.querySelectorAll('[data-lesson]').forEach(a=>a.href=href(task,Number(a.dataset.lesson),true));
     });
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
+  if(task===4)document.addEventListener('rki-task4-ready',mount,{once:true});else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })();
